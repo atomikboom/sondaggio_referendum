@@ -8,7 +8,7 @@ export default function PrivacyPage() {
         
         <section>
           <h2>1. Titolare del Trattamento</h2>
-          <p>Il titolare del trattamento è [Inserire Nome/Ente]. Questo sondaggio è condotto esclusivamente per finalità statistiche e informative relative al referendum sulla giustizia.</p>
+          <p>Il titolare del trattamento è mable.roy479@altmail.kr. Questo sondaggio è condotto esclusivamente per finalità statistiche e informative relative al referendum sulla giustizia.</p>
         </section>
  
         <section>
