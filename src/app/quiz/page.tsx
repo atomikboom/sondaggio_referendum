@@ -64,17 +64,22 @@ export default function QuizPage() {
   return (
     <div className="container">
       <div className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-          <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-muted)' }}>
-            Domanda {currentIdx + 1} di {QUESTIONS.length}
-          </span>
-          <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--primary)' }}>
-            {question.module.replace(/_/g, ' ')}
-          </span>
-        </div>
-
-        <div className="progress-bar">
-          <div className="progress-fill" style={{ width: `${progress}%` }}></div>
+        <div style={{ marginBottom: '2rem', textAlign: 'center' }}>
+          <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '1.5px', marginBottom: '0.5rem' }}>
+            Quesito {currentIdx + 1} di {QUESTIONS.length}
+          </div>
+          <div className="progress-bar" style={{ height: '8px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', overflow: 'hidden' }}>
+            <div className="progress-fill" style={{ 
+              width: `${progress}%`, 
+              height: '100%', 
+              background: 'var(--primary)', 
+              boxShadow: '0 0 10px var(--primary)',
+              transition: 'width 0.3s ease' 
+            }}></div>
+          </div>
+          <div style={{ marginTop: '0.75rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+            Modulo: <span style={{ color: 'var(--text)', fontWeight: 600 }}>{question.module.replace(/_/g, ' ')}</span>
+          </div>
         </div>
 
         <h2 style={{ fontSize: '1.25rem', lineHeight: '1.4', marginBottom: '1.5rem' }}>

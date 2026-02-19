@@ -25,11 +25,17 @@ export async function GET(req: Request) {
             _count: { ageBand: true },
         });
 
+        const responses = await prisma.response.findMany({
+            orderBy: { createdAt: 'desc' },
+            take: 100,
+        });
+
         return NextResponse.json({
             totalCount,
             leanCounts,
             sexBreakdown,
             ageBreakdown,
+            responses,
         });
     } catch (error) {
         console.error('Error in /api/admin/stats:', error);
