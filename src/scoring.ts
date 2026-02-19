@@ -1,15 +1,15 @@
-import { QUESTIONS, Question, Axis, ScoreVector } from "./questions";
+import type { Question, ScoreVector } from "./questions";
 
 export type LikertValue = 1 | 2 | 3 | 4 | 5;
 export type AnswerValue = LikertValue | string; // string = optionId per single_choice
-
 export type Answers = Record<string, AnswerValue | "DK" | undefined>;
 
 export interface ScoreResult {
     totals: ScoreVector;
-    maxAbs: ScoreVector; // massimo assoluto teorico (serve per soglie %)
+    maxAbs: ScoreVector; // massimo assoluto teorico
     byModule: Record<string, ScoreVector>;
-    completion: number;  // 0..1
+    completion: number; // 0..1 (solo domande required)
+    normalized: ScoreVector; // totals/maxAbs in [-1,1] quando maxAbs>0
 }
 
 const ZERO: ScoreVector = { yesNo: 0, accountability: 0 };
@@ -20,21 +20,22 @@ function add(a: ScoreVector, b: ScoreVector): ScoreVector {
 function scale(v: ScoreVector, k: number): ScoreVector {
     return { yesNo: v.yesNo * k, accountability: v.accountability * k };
 }
+function safeDiv(n: number, d: number) {
+    return d === 0 ? 0 : n / d;
+}
 
 /** Likert step: 1..5 -> -2..+2 */
 function likertStep(v: LikertValue): number {
-    return (v - 3) as number;
+    return v - 3;
 }
 
 function maxAbsForQuestion(q: Question): ScoreVector {
     if (q.kind === "likert5") {
-        // max step = 2
         return {
             yesNo: Math.abs(q.scoring.vectorPerStep.yesNo) * 2,
-            accountability: Math.abs(q.scoring.vectorPerStep.accountability) * 2
+            accountability: Math.abs(q.scoring.vectorPerStep.accountability) * 2,
         };
     }
-    // single_choice: max assoluto tra opzioni
     let maxYes = 0;
     let maxAcc = 0;
     for (const opt of q.options) {
@@ -44,27 +45,38 @@ function maxAbsForQuestion(q: Question): ScoreVector {
     return { yesNo: maxYes, accountability: maxAcc };
 }
 
+function isValidChoiceId(q: Extract<Question, { kind: "single_choice" }>, a: string) {
+    return q.options.some((o) => o.id === a);
+}
+
 export function scoreAnswers(questions: Question[], answers: Answers): ScoreResult {
     let totals: ScoreVector = { ...ZERO };
     let maxAbs: ScoreVector = { ...ZERO };
     const byModule: Record<string, ScoreVector> = {};
-    let answered = 0;
+
+    let answeredRequired = 0;
     let required = 0;
 
     for (const q of questions) {
         const isReq = q.required ?? false;
         if (isReq) required += 1;
 
-        // max teorico
         maxAbs = add(maxAbs, maxAbsForQuestion(q));
-
         if (!byModule[q.module]) byModule[q.module] = { ...ZERO };
 
         const a = answers[q.id];
         if (a === undefined) continue;
 
-        // conteggio completion (solo sulle required)
-        if (isReq) answered += 1;
+        // valida risposta
+        let valid = false;
+        if (q.kind === "likert5") {
+            valid = a === "DK" || (typeof a === "number" && a >= 1 && a <= 5);
+        } else {
+            valid = a === "DK" || (typeof a === "string" && isValidChoiceId(q, a));
+        }
+        if (!valid) continue;
+
+        if (isReq) answeredRequired += 1;
 
         let contrib: ScoreVector = { ...ZERO };
 
@@ -75,11 +87,11 @@ export function scoreAnswers(questions: Question[], answers: Answers): ScoreResu
                 const step = likertStep(a as LikertValue);
                 contrib = scale(q.scoring.vectorPerStep, step);
             }
-        } else if (q.kind === "single_choice") {
+        } else {
             if (a === "DK") {
                 contrib = q.scoring?.dkVector ?? ZERO;
             } else {
-                const opt = q.options.find(o => o.id === a);
+                const opt = q.options.find((o) => o.id === a);
                 contrib = opt ? opt.score : ZERO;
             }
         }
@@ -88,8 +100,13 @@ export function scoreAnswers(questions: Question[], answers: Answers): ScoreResu
         byModule[q.module] = add(byModule[q.module], contrib);
     }
 
-    const completion = required === 0 ? 1 : answered / required;
-    return { totals, maxAbs, byModule, completion };
+    const completion = required === 0 ? 1 : answeredRequired / required;
+    const normalized: ScoreVector = {
+        yesNo: safeDiv(totals.yesNo, maxAbs.yesNo),
+        accountability: safeDiv(totals.accountability, maxAbs.accountability),
+    };
+
+    return { totals, maxAbs, byModule, completion, normalized };
 }
 
 export type Lean = "SÌ" | "NO" | "INCERTO";
@@ -110,20 +127,20 @@ function strengthFromRatio(r: number): Strength {
 }
 
 export function interpretScore(res: ScoreResult): Interpretation {
-    // soglie percentuali sul massimo teorico (robuste anche se aggiungi domande)
     const yesRatio = res.maxAbs.yesNo === 0 ? 0 : Math.abs(res.totals.yesNo) / res.maxAbs.yesNo;
-    const accRatio = res.maxAbs.accountability === 0 ? 0 : res.totals.accountability / res.maxAbs.accountability;
+    const accNorm = res.normalized.accountability; // [-1,1]
 
-    const lean: Lean =
-        yesRatio < 0.20 ? "INCERTO" : (res.totals.yesNo > 0 ? "SÌ" : "NO");
+    const lean: Lean = yesRatio < 0.2 ? "INCERTO" : res.totals.yesNo > 0 ? "SÌ" : "NO";
 
     const motive: Motive =
-        Math.abs(accRatio) < 0.20 ? "Bilanciato"
-            : (accRatio > 0 ? "Accountability/Controllo" : "Autogoverno/Indipendenza");
+        Math.abs(accNorm) < 0.2
+            ? "Bilanciato"
+            : accNorm > 0
+                ? "Accountability/Controllo"
+                : "Autogoverno/Indipendenza";
 
     const strength = strengthFromRatio(yesRatio);
 
-    // Quadranti “narrativi”
     let quadrantLabel = "";
     if (lean === "SÌ" && motive === "Accountability/Controllo")
         quadrantLabel = "SÌ: riforma come leva di accountability e riequilibrio";
@@ -133,8 +150,7 @@ export function interpretScore(res: ScoreResult): Interpretation {
         quadrantLabel = "NO: priorità a indipendenza/autogoverno e prudenza istituzionale";
     else if (lean === "NO" && motive === "Accountability/Controllo")
         quadrantLabel = "NO: obiettivo accountability, ma sfiducia nel design proposto";
-    else
-        quadrantLabel = "Area mista: servono chiarimenti sui trade-off chiave";
+    else quadrantLabel = "Area mista: servono chiarimenti sui trade-off chiave";
 
     return { lean, motive, quadrantLabel, strength };
 }

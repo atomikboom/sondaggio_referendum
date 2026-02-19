@@ -108,7 +108,7 @@ export default function ResultPage() {
         <div style={{ textAlign: 'left', marginBottom: '3rem' }}>
           <h3 style={{ fontSize: '0.9rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '1.5rem' }}>Fattori chiave della tua scelta:</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-            {topModules.map(([name, scores]: [string, any]) => (
+            {topModules.map(([name, scores]: [string, { yesNo: number }]) => (
               <div key={name} style={{ background: 'rgba(0,0,0,0.1)', padding: '1.5rem', borderRadius: 'var(--radius)', borderLeft: `4px solid ${scores.yesNo > 0 ? '#10b981' : '#ef4444'}` }}>
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>{name.replace(/_/g, ' ').replace(/[A-D] /, '')}</div>
                 <div style={{ fontWeight: 800, color: (scores.yesNo > 0 ? '#10b981' : '#ef4444') }}>

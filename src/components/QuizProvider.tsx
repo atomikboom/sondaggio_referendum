@@ -1,17 +1,19 @@
 'use client';
 
 import React, { createContext, useContext, useState } from 'react';
+import { Answers, Interpretation, AnswerValue } from '@/scoring';
+import { ScoreVector } from '@/questions';
 
 interface QuizContextType {
   user: {
     sex: string;
     age: string;
   };
-  answers: Record<string, any>;
-  result: any;
+  answers: Answers;
+  result: (Interpretation & { totals: ScoreVector; byModule: Record<string, ScoreVector> }) | null;
   setUser: (user: { sex: string; age: string }) => void;
-  setAnswer: (questionId: string, answer: any) => void;
-  setResult: (result: any) => void;
+  setAnswer: (questionId: string, answer: AnswerValue | "DK") => void;
+  setResult: (result: (Interpretation & { totals: ScoreVector; byModule: Record<string, ScoreVector> })) => void;
   reset: () => void;
 }
 
@@ -19,12 +21,12 @@ const QuizContext = createContext<QuizContextType | undefined>(undefined);
 
 export function QuizProvider({ children }: { children: React.ReactNode }) {
   const [user, setUserState] = useState({ sex: '', age: '' });
-  const [answers, setAnswers] = useState<Record<string, any>>({});
-  const [result, setResult] = useState<any>(null);
+  const [answers, setAnswers] = useState<Answers>({});
+  const [result, setResult] = useState<(Interpretation & { totals: ScoreVector; byModule: Record<string, ScoreVector> }) | null>(null);
 
   const setUser = (user: { sex: string; age: string }) => setUserState(user);
-  const setAnswer = (questionId: string, answer: any) => {
-    setAnswers(prev => ({ ...prev, [questionId]: answer }));
+  const setAnswer = (questionId: string, answer: AnswerValue | "DK") => {
+    setAnswers((prev: Answers) => ({ ...prev, [questionId]: answer }));
   };
   const reset = () => {
     setUserState({ sex: '', age: '' });

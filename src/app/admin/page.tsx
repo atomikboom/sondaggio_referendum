@@ -3,9 +3,18 @@
 import { useState } from 'react';
 import { QUESTIONS } from '@/questions';
 
+interface AdminStats {
+  totalCount: number;
+  leanCounts: { lean: string; _count: { lean: number } }[];
+  sexBreakdown: { sex: string; _count: { sex: number } }[];
+  ageBreakdown: { ageBand: string; _count: { ageBand: number } }[];
+  responses: { id: string; createdAt: string; sex: string; ageBand: string; lean: string; strength: string; scoreYesNo: number; scoreAccountability: number }[];
+  questionStats: Record<string, { avg: number; dist: Record<string, number>; count: number }>;
+}
+
 export default function AdminPage() {
   const [password, setPassword] = useState('');
-  const [stats, setStats] = useState<any>(null);
+  const [stats, setStats] = useState<AdminStats | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -22,7 +31,7 @@ export default function AdminPage() {
       } else {
         setError('Password errata o non autorizzato.');
       }
-    } catch (err) {
+    } catch {
       setError('Errore di connessione.');
     } finally {
       setLoading(false);
@@ -44,7 +53,7 @@ export default function AdminPage() {
         a.click();
         a.remove();
       }
-    } catch (err) {
+    } catch {
       console.error('Export failed');
     }
   };
@@ -100,7 +109,7 @@ export default function AdminPage() {
             <div style={{ fontSize: '2.5rem', fontWeight: 800, marginTop: '0.5rem' }}>{stats.totalCount}</div>
           </div>
           {['SÌ', 'NO', 'INCERTO'].map(lean => {
-            const item = stats.leanCounts.find((i: any) => i.lean === lean);
+            const item = stats.leanCounts.find((i: { lean: string; _count: { lean: number } }) => i.lean === lean);
             const count = item?._count.lean || 0;
             return (
               <div key={lean} style={{ background: 'rgba(255,255,255,0.03)', padding: '1.5rem', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
@@ -126,7 +135,7 @@ export default function AdminPage() {
                 </tr>
               </thead>
               <tbody>
-                {stats.sexBreakdown.map((item: any) => (
+                {stats.sexBreakdown.map((item: { sex: string; _count: { sex: number } }) => (
                   <tr key={item.sex} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                     <td style={{ padding: '0.75rem' }}>{item.sex}</td>
                     <td style={{ padding: '0.75rem' }}>{item._count.sex}</td>
@@ -148,7 +157,7 @@ export default function AdminPage() {
                 </tr>
               </thead>
               <tbody>
-                {stats.ageBreakdown.map((item: any) => (
+                {stats.ageBreakdown.map((item: { ageBand: string; _count: { ageBand: number } }) => (
                   <tr key={item.ageBand} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                     <td style={{ padding: '0.75rem' }}>{item.ageBand}</td>
                     <td style={{ padding: '0.75rem' }}>{item._count.ageBand}</td>
@@ -188,7 +197,7 @@ export default function AdminPage() {
                       const pct = stats.totalCount > 0 ? (count / stats.totalCount) * 100 : 0;
                       if (pct === 0) return null;
                       
-                      const colors: any = { '1': '#ef4444', '2': '#f87171', '3': '#94a3b8', '4': '#4ade80', '5': '#10b981', 'DK': '#475569' };
+                      const colors: Record<string, string> = { '1': '#ef4444', '2': '#f87171', '3': '#94a3b8', '4': '#4ade80', '5': '#10b981', 'DK': '#475569' };
                       
                       return (
                         <div 
@@ -230,7 +239,7 @@ export default function AdminPage() {
               </tr>
             </thead>
             <tbody>
-              {stats.responses.map((resp: any) => (
+              {stats.responses.map((resp: { id: string; createdAt: string; sex: string; ageBand: string; lean: string; strength: string; scoreYesNo: number; scoreAccountability: number }) => (
                 <tr key={resp.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                   <td style={{ padding: '1rem', whiteSpace: 'nowrap' }}>{new Date(resp.createdAt).toLocaleString()}</td>
                   <td style={{ padding: '1rem' }}>{resp.sex}</td>

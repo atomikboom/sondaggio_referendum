@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuiz } from '@/components/QuizProvider';
 import { QUESTIONS } from '@/questions';
+import { LikertValue } from '@/scoring';
 
 export default function QuizPage() {
   const router = useRouter();
@@ -106,7 +107,7 @@ export default function QuizPage() {
                   <button
                     key={val}
                     className={`btn ${currentAnswer === val ? 'btn-primary' : 'btn-secondary'}`}
-                    onClick={() => setAnswer(question.id, val)}
+                    onClick={() => setAnswer(question.id, val as LikertValue)}
                     style={{ padding: '1rem 0.5rem', fontSize: '1.1rem' }}
                   >
                     {val}

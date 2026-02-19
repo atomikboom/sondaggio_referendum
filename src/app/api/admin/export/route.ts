@@ -27,7 +27,7 @@ export async function GET(req: Request) {
 
         let csv = headers.join(',') + '\n';
 
-        responses.forEach((resp: any) => {
+        responses.forEach((resp: { id: string; createdAt: Date; sex: string; ageBand: string; lean: string; strength: string; scoreYesNo: number; scoreAccountability: number; answersJson: string }) => {
             const row = [
                 resp.id,
                 resp.createdAt.toISOString(),

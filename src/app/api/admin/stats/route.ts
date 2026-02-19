@@ -54,7 +54,7 @@ export async function GET(req: Request) {
                     const key = String(val);
                     questionStats[qId].dist[key] = (questionStats[qId].dist[key] || 0) + 1;
                 });
-            } catch (e) {
+            } catch {
                 // ignore malformed JSON
             }
         });

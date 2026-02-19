@@ -1,22 +1,25 @@
+// src/questions.ts
+
 export type Axis = "yesNo" | "accountability";
 
 /**
- * yesNo:
- *   +  => propensione verso Sì (approvare la riforma)
- *   -  => propensione verso No (respingere la riforma)
- *
- * accountability:
- *   +  => preferenza per più controlli/garanzie esterne e accountability (organi dedicati, incompatibilità forti, ecc.)
- *   -  => preferenza per più autogoverno/indipendenza interna e minore “filtro” esterno
+ * Axis meanings (keep consistent with scoring.ts):
+ * - yesNo:
+ *    +  => propensione verso SÌ (approvare la riforma)
+ *    -  => propensione verso NO (respingere la riforma)
+ * - accountability:
+ *    +  => maggiore sensibilità a rischi di influenza politica / bisogno di contrappesi e accountability
+ *    -  => maggiore tolleranza al modello proposto / priorità ad altri problemi (es. correntismo) rispetto al rischio “cattura”
  */
 export type ScoreVector = Record<Axis, number>;
 
 export type Module =
-    | "A_Architettura"
-    | "B_CSM_Sorteggio"
-    | "C_AltaCorte"
-    | "D_Coordinamento_Transitorio"
-    | "E_Scenari";
+    | "A_PesoRiforma"
+    | "B_Carriere"
+    | "C_CSM_Sorteggio"
+    | "D_Disciplina"
+    | "E_Transizione"
+    | "F_Scenari";
 
 export type QuestionKind = "likert5" | "single_choice";
 
@@ -24,32 +27,33 @@ export interface BaseQuestion {
     id: string;
     module: Module;
     text: string;
-    help: string;      // contenuto per il popover del "?"
-    legalRef?: string; // riferimento sintetico (non obbligatorio)
+    help: string; // contenuto popover "?"
+    legalRef?: string;
     required?: boolean;
     kind: QuestionKind;
 }
 
 export interface Likert5Question extends BaseQuestion {
     kind: "likert5";
-    // contributo per "step" di Likert: step = (valore - 3) => -2..+2
-    // punteggio = step * vectorPerStep
+    /**
+     * Likert: 1..5 -> step = (val - 3) => -2..+2
+     * contribution = step * vectorPerStep
+     */
     scoring: {
         vectorPerStep: ScoreVector;
-        dkVector?: ScoreVector; // se l’utente sceglie "NS", default 0
+        dkVector?: ScoreVector; // default 0
     };
 }
 
 export interface ChoiceOption {
     id: string;
     label: string;
-    help?: string;     // opzionale: micro-tooltip sull'opzione
     score: ScoreVector;
 }
 
 export interface SingleChoiceQuestion extends BaseQuestion {
     kind: "single_choice";
-    options: ChoiceOption[];
+    options: ChoiceOption[]; // include "DK"
     scoring?: {
         dkVector?: ScoreVector;
     };
@@ -57,435 +61,308 @@ export interface SingleChoiceQuestion extends BaseQuestion {
 
 export type Question = Likert5Question | SingleChoiceQuestion;
 
+const ZERO: ScoreVector = { yesNo: 0, accountability: 0 };
+
 export const QUESTIONS: Question[] = [
     // =========================
-    // A — ARCHITETTURA
+    // A — PESO DELLA RIFORMA
     // =========================
     {
-        id: "A01",
-        module: "A_Architettura",
+        id: "Q01",
+        module: "A_PesoRiforma",
         kind: "likert5",
         text:
-            "Scrivere in Costituzione che esistono distinte carriere per magistrati giudicanti e requirenti è un miglioramento.",
+            "Per cambiare l’assetto della magistratura ha senso intervenire direttamente in Costituzione (e non solo con leggi ordinarie).",
         help:
-            "La riforma aggiunge che le norme sull’ordinamento giudiziario disciplinano anche le distinte carriere (giudicante/requirente).",
-        legalRef: "Cost. art. 102 (mod.)",
-        scoring: { vectorPerStep: { yesNo: +1.0, accountability: +0.1 } },
+            "Qui valuti il “peso” della scelta: una riforma costituzionale è più stabile e difficile da cambiare. Può dare una direzione chiara, ma è anche più complessa da correggere se emergono problemi.",
         required: true,
+        scoring: { vectorPerStep: { yesNo: +0.9, accountability: -0.1 }, dkVector: ZERO },
     },
     {
-        id: "A02",
-        module: "A_Architettura",
+        id: "Q02",
+        module: "A_PesoRiforma",
         kind: "likert5",
         text:
-            "La magistratura dovrebbe essere descritta come composta da carriera giudicante e carriera requirente.",
+            "Mi fido che un cambiamento costituzionale ampio possa migliorare il sistema nel lungo periodo senza creare effetti collaterali gravi.",
         help:
-            "Il nuovo impianto esplicita in Costituzione le due carriere all’interno dell’ordine autonomo e indipendente.",
-        legalRef: "Cost. art. 104 (mod.)",
-        scoring: { vectorPerStep: { yesNo: +0.8, accountability: +0.1 } },
+            "Questa domanda misura la fiducia “di fondo” nel pacchetto: le riforme grandi possono risolvere problemi strutturali, ma possono anche spostare equilibri delicati e produrre conseguenze impreviste.",
         required: true,
+        scoring: { vectorPerStep: { yesNo: +1.0, accountability: -0.2 }, dkVector: ZERO },
     },
     {
-        id: "A03",
-        module: "A_Architettura",
-        kind: "likert5",
-        text:
-            "Separare le carriere rischia di aumentare la distanza culturale tra chi accusa e chi giudica, peggiorando l’equilibrio complessivo.",
+        id: "Q03",
+        module: "A_PesoRiforma",
+        kind: "single_choice",
+        text: "Quale problema ti sembra più urgente risolvere?",
         help:
-            "È una valutazione di sistema: due carriere e due organi di autogoverno possono produrre prassi e culture più divergenti.",
-        scoring: { vectorPerStep: { yesNo: -1.0, accountability: -0.2 } },
+            "Serve a capire da quale “preoccupazione principale” parti: (A) rischio di influenza politica sulla magistratura, oppure (B) correntismo/opacità nell’autogoverno. Non è una domanda ‘giusta/sbagliata’: misura la priorità.",
         required: true,
+        options: [
+            {
+                id: "A",
+                label: "Il rischio che la politica possa influenzare la magistratura.",
+                score: { yesNo: -0.6, accountability: +1.0 },
+            },
+            {
+                id: "B",
+                label: "Il rischio che l’autogoverno resti opaco/correntizio.",
+                score: { yesNo: +0.7, accountability: -0.7 },
+            },
+            { id: "DK", label: "Non so / dipende", score: ZERO },
+        ],
     },
 
     // =========================
-    // B — DUE CSM / SORTEGGIO
+    // B — CARRIERE (GIUDICI/PM)
     // =========================
     {
-        id: "B01",
-        module: "B_CSM_Sorteggio",
+        id: "Q04",
+        module: "B_Carriere",
         kind: "likert5",
-        text:
-            "Avere due CSM distinti (giudicante e requirente) rende più chiaro chi decide su carriere e nomine.",
+        text: "Separare le carriere di giudici e PM è una buona idea.",
         help:
-            "Il testo prevede due Consigli superiori distinti, uno per la magistratura giudicante e uno per la requirente.",
-        legalRef: "Cost. art. 104 (mod.)",
-        scoring: { vectorPerStep: { yesNo: +1.0, accountability: +0.2 } },
+            "Vuol dire che chi giudica e chi accusa seguono percorsi professionali distinti. Per alcuni aumenta chiarezza e distanza tra ruoli; per altri può creare due ‘blocchi’ più separati.",
         required: true,
+        scoring: { vectorPerStep: { yesNo: +1.0, accountability: -0.1 }, dkVector: ZERO },
     },
     {
-        id: "B02",
-        module: "B_CSM_Sorteggio",
+        id: "Q05",
+        module: "B_Carriere",
         kind: "likert5",
         text:
-            "È giusto che i due CSM siano presieduti dal Presidente della Repubblica.",
+            "Con carriere separate, il giudice appare più credibilmente “terzo” (imparziale) rispetto all’accusa.",
         help:
-            "Entrambi i Consigli superiori sono presieduti dal Presidente della Repubblica.",
-        legalRef: "Cost. art. 104 (mod.)",
-        scoring: { vectorPerStep: { yesNo: +0.5, accountability: +0.1 } },
+            "Qui misuri la fiducia/percezione di imparzialità: più distanza istituzionale tra giudice e PM potrebbe aumentare la sensazione di neutralità del giudice.",
         required: true,
+        scoring: { vectorPerStep: { yesNo: +0.8, accountability: -0.1 }, dkVector: ZERO },
     },
     {
-        id: "B03",
-        module: "B_CSM_Sorteggio",
+        id: "Q06",
+        module: "B_Carriere",
         kind: "likert5",
         text:
-            "Mi convince che una quota dei componenti del CSM sia estratta a sorte da un elenco di professori ordinari e avvocati con almeno 15 anni (elenco compilato dal Parlamento).",
+            "Carriere separate aumentano il rischio che accusa e giudice diventino due “blocchi” contrapposti, con prassi più rigide.",
         help:
-            "Un terzo dei componenti è estratto a sorte da un elenco (professori/avvocati ≥15 anni) che il Parlamento in seduta comune compila mediante elezione.",
-        legalRef: "Cost. art. 104 (mod.)",
-        scoring: { vectorPerStep: { yesNo: +1.1, accountability: +0.6 } },
+            "Questa domanda cattura un possibile effetto collaterale: maggiore separazione può portare a maggiore polarizzazione tra ruoli (anche solo come cultura organizzativa).",
         required: true,
-    },
-    {
-        id: "B04",
-        module: "B_CSM_Sorteggio",
-        kind: "likert5",
-        text:
-            "Mi convince che i restanti componenti siano estratti a sorte tra i magistrati giudicanti/requirenti (numero e procedure demandati alla legge).",
-        help:
-            "Per due terzi i componenti sono sorteggiati tra i magistrati delle rispettive carriere, secondo numero/procedure stabiliti dalla legge.",
-        legalRef: "Cost. art. 104 (mod.)",
-        scoring: { vectorPerStep: { yesNo: +1.0, accountability: +0.3 } },
-        required: true,
-    },
-    {
-        id: "B05",
-        module: "B_CSM_Sorteggio",
-        kind: "likert5",
-        text:
-            "Preferisco il sorteggio (anti-correntismo) all’elezione per selezionare i membri del CSM.",
-        help:
-            "Domanda di governance: sorteggio come riduzione delle correnti vs elezione come rappresentanza/mandato.",
-        scoring: { vectorPerStep: { yesNo: +0.7, accountability: +0.5 } },
-        required: true,
-    },
-    {
-        id: "B06",
-        module: "B_CSM_Sorteggio",
-        kind: "likert5",
-        text:
-            "È corretto che ciascun CSM elegga il vicepresidente tra i componenti sorteggiati dall’elenco compilato dal Parlamento.",
-        help:
-            "Il vicepresidente è scelto tra i componenti designati mediante sorteggio dall’elenco parlamentare.",
-        legalRef: "Cost. art. 104 (mod.)",
-        scoring: { vectorPerStep: { yesNo: +0.6, accountability: +0.6 } },
-        required: true,
-    },
-    {
-        id: "B07",
-        module: "B_CSM_Sorteggio",
-        kind: "likert5",
-        text:
-            "Mandato di 4 anni e impossibilità di partecipare al sorteggio successivo sono regole utili.",
-        help:
-            "I componenti sorteggiati durano 4 anni e non possono partecipare al sorteggio successivo (anti-cristallizzazione).",
-        legalRef: "Cost. art. 104 (mod.)",
-        scoring: { vectorPerStep: { yesNo: +0.6, accountability: +0.4 } },
-        required: true,
-    },
-    {
-        id: "B08",
-        module: "B_CSM_Sorteggio",
-        kind: "likert5",
-        text:
-            "Le incompatibilità (non iscrizione ad albi, non far parte di Parlamento/Consiglio regionale) sono necessarie e positive.",
-        help:
-            "Il testo vieta, finché in carica, iscrizione agli albi professionali e appartenenza a Parlamento o Consiglio regionale.",
-        legalRef: "Cost. art. 104 (mod.)",
-        scoring: { vectorPerStep: { yesNo: +0.5, accountability: +0.8 } },
-        required: true,
+        scoring: { vectorPerStep: { yesNo: -0.9, accountability: +0.2 }, dkVector: ZERO },
     },
 
     // =========================
-    // C — ALTA CORTE DISCIPLINARE
+    // C — DUE CSM / SORTEGGIO
     // =========================
     {
-        id: "C01",
-        module: "C_AltaCorte",
+        id: "Q07",
+        module: "C_CSM_Sorteggio",
         kind: "likert5",
         text:
-            "La giurisdizione disciplinare sui magistrati dovrebbe essere attribuita a un’Alta Corte disciplinare dedicata, non ai CSM.",
+            "Avere due CSM (uno per giudici e uno per PM) rende il sistema più ordinato e coerente.",
         help:
-            "La riforma attribuisce la disciplina all’Alta Corte; ai CSM restano (secondo ordinamento giudiziario) assunzioni, trasferimenti, valutazioni, funzioni.",
-        legalRef: "Cost. art. 105 (mod.)",
-        scoring: { vectorPerStep: { yesNo: +1.2, accountability: +1.0 } },
+            "Pro: ogni carriera avrebbe regole e governo più “specializzati”. Contro: due organi possono divergere e creare disomogeneità o attriti istituzionali.",
         required: true,
+        scoring: { vectorPerStep: { yesNo: +0.8, accountability: +0.1 }, dkVector: ZERO },
     },
     {
-        id: "C02",
-        module: "C_AltaCorte",
+        id: "Q08",
+        module: "C_CSM_Sorteggio",
         kind: "likert5",
         text:
-            "Mi convince la composizione dell’Alta Corte (15 giudici con quote miste: Presidente della Repubblica, elenco parlamentare, magistrati sorteggiati).",
+            "Mi preoccupa che due CSM possano applicare criteri diversi su valutazioni e carriere, creando disomogeneità.",
         help:
-            "15 giudici: 3 nominati dal Presidente della Repubblica; 3 sorteggiati da elenco parlamentare; 6 giudicanti e 3 requirenti sorteggiati tra categorie con requisiti alti.",
-        legalRef: "Cost. art. 105 (mod.)",
-        scoring: { vectorPerStep: { yesNo: +1.0, accountability: +1.0 } },
+            "Qui valuti quanto ti pesa la possibilità che due organi distinti adottino prassi diverse (anche se entrambe ‘legittime’), con effetti di incoerenza.",
         required: true,
+        scoring: { vectorPerStep: { yesNo: -0.7, accountability: +0.2 }, dkVector: ZERO },
     },
     {
-        id: "C03",
-        module: "C_AltaCorte",
+        id: "Q09",
+        module: "C_CSM_Sorteggio",
         kind: "likert5",
         text:
-            "Requisiti molto selettivi (anzianità elevata e funzioni di legittimità) aumentano qualità e imparzialità dell’organo disciplinare.",
+            "Usare il sorteggio per scegliere parte dei membri dei CSM è un modo accettabile per ridurre correnti e accordi.",
         help:
-            "I membri togati sorteggiati richiedono almeno 20 anni di funzioni e svolgimento (o pregresso) di funzioni di legittimità.",
-        legalRef: "Cost. art. 105 (mod.)",
-        scoring: { vectorPerStep: { yesNo: +0.7, accountability: +0.6 } },
+            "Il sorteggio può ridurre campagne e cordate, ma può anche ridurre la selezione “per mandato” (chi è scelto per un programma o una reputazione specifica).",
         required: true,
+        scoring: { vectorPerStep: { yesNo: +0.7, accountability: -0.2 }, dkVector: ZERO },
     },
     {
-        id: "C04",
-        module: "C_AltaCorte",
+        id: "Q10",
+        module: "C_CSM_Sorteggio",
         kind: "likert5",
         text:
-            "È una buona garanzia che il Presidente dell’Alta Corte sia eletto tra i membri ‘esterni’ (nominati dal PdR o sorteggiati dall’elenco parlamentare).",
+            "Il sorteggio rende più difficile capire chi “risponde” delle decisioni (meno accountability).",
         help:
-            "Il Presidente dell’Alta Corte è eletto tra i giudici nominati dal PdR o sorteggiati dall’elenco parlamentare.",
-        legalRef: "Cost. art. 105 (mod.)",
-        scoring: { vectorPerStep: { yesNo: +0.6, accountability: +0.9 } },
+            "Con elezione/nomina è spesso più chiaro chi ha sostenuto chi e perché. Con il sorteggio, attribuire responsabilità per le scelte può diventare più difficile.",
         required: true,
+        scoring: { vectorPerStep: { yesNo: -0.6, accountability: +0.6 }, dkVector: ZERO },
     },
     {
-        id: "C05",
-        module: "C_AltaCorte",
+        id: "Q11",
+        module: "C_CSM_Sorteggio",
         kind: "likert5",
         text:
-            "Mandato 4 anni non rinnovabile e incompatibilità (politica/avvocatura/altre) sono un set di garanzie adeguato.",
+            "È un problema che parte dei membri non-magistrati venga estratta da una lista formata dal Parlamento (anche se poi c’è il sorteggio).",
         help:
-            "Durata 4 anni non rinnovabile; incompatibilità con incarichi politici, Governo, professione forense e altre indicate dalla legge.",
-        legalRef: "Cost. art. 105 (mod.)",
-        scoring: { vectorPerStep: { yesNo: +0.6, accountability: +1.0 } },
+            "Questo è un punto dove la politica entra materialmente: il Parlamento forma un elenco. Per alcuni è un bilanciamento ‘democratico’; per altri è un canale di possibile influenza politica sull’autogoverno.",
         required: true,
-    },
-    {
-        id: "C06",
-        module: "C_AltaCorte",
-        kind: "likert5",
-        text:
-            "Mi preoccupa che l’impugnazione delle decisioni disciplinari sia solo davanti alla stessa Alta Corte (anche se senza i giudici del primo grado).",
-        help:
-            "È ammessa impugnazione anche per merito, ma soltanto dinanzi alla stessa Alta Corte, con collegio diverso.",
-        legalRef: "Cost. art. 105 (mod.)",
-        scoring: { vectorPerStep: { yesNo: -0.9, accountability: -0.6 } },
-        required: true,
-    },
-    {
-        id: "C07",
-        module: "C_AltaCorte",
-        kind: "likert5",
-        text:
-            "È importante che la legge disciplini il procedimento e assicuri la rappresentanza di magistrati giudicanti/requirenti nei collegi.",
-        help:
-            "La norma rimanda alla legge: illeciti, sanzioni, collegi, procedimento, funzionamento; e richiede rappresentanza nei collegi.",
-        legalRef: "Cost. art. 105 (mod.)",
-        scoring: { vectorPerStep: { yesNo: +0.4, accountability: +0.5 } },
-        required: true,
+        scoring: { vectorPerStep: { yesNo: -1.0, accountability: +1.0 }, dkVector: ZERO },
     },
 
     // =========================
-    // D — COORDINAMENTO / TRANSITORIO
+    // D — DISCIPLINA (ALTA CORTE)
     // =========================
     {
-        id: "D01",
-        module: "D_Coordinamento_Transitorio",
+        id: "Q12",
+        module: "D_Disciplina",
         kind: "likert5",
         text:
-            "È coerente che alcune formule diventino ‘del rispettivo Consiglio’/‘di ciascun Consiglio’ per adattare il testo al doppio CSM.",
+            "Spostare la disciplina dei magistrati su un organo separato (Alta Corte) è un miglioramento.",
         help:
-            "Modifiche di coordinamento testuale: con due CSM, i riferimenti vengono adeguati.",
-        legalRef: "Cost. artt. 107 e 110 (mod.)",
-        scoring: { vectorPerStep: { yesNo: +0.4, accountability: +0.2 } },
+            "Pro: un organo dedicato può essere più specializzato e meno legato a dinamiche interne. Contro: se viene percepito come influenzabile, può diventare una leva indiretta sulle decisioni dei magistrati.",
         required: true,
+        scoring: { vectorPerStep: { yesNo: +0.7, accountability: +0.4 }, dkVector: ZERO },
     },
     {
-        id: "D02",
-        module: "D_Coordinamento_Transitorio",
+        id: "Q13",
+        module: "D_Disciplina",
         kind: "likert5",
         text:
-            "Mi convince includere anche magistrati requirenti con almeno 15 anni tra i possibili chiamati in base all’art. 106 (come modificato).",
+            "Se un organo disciplinare è percepito come influenzabile dalla politica, aumenta il rischio che i magistrati “si autocensurino” nei casi sensibili.",
         help:
-            "Il testo integra l’art. 106 (3° comma) includendo magistrati requirenti con almeno 15 anni (oltre ai professori e avvocati previsti).",
-        legalRef: "Cost. art. 106 (mod.)",
-        scoring: { vectorPerStep: { yesNo: +0.5, accountability: +0.2 } },
+            "Questo è il rischio di “pressione indiretta” (chilling effect): non serve un ordine esplicito. Può bastare il timore di conseguenze su carriera o disciplina per rendere più prudenti inchieste/decisioni scomode.",
         required: true,
+        scoring: { vectorPerStep: { yesNo: -1.1, accountability: +1.0 }, dkVector: ZERO },
     },
     {
-        id: "D03",
-        module: "D_Coordinamento_Transitorio",
+        id: "Q14",
+        module: "D_Disciplina",
         kind: "likert5",
         text:
-            "Accetto un periodo transitorio: leggi di adeguamento entro 1 anno e, fino ad allora, applicazione delle norme previgenti.",
+            "Incompatibilità molto rigide (niente incarichi politici, conflitti d’interesse) sono una garanzia sufficiente contro la politicizzazione.",
         help:
-            "Disposizioni transitorie: adeguamento entro un anno; nel frattempo continuano a valere le norme vigenti.",
-        legalRef: "Disposizioni transitorie",
-        scoring: { vectorPerStep: { yesNo: +0.7, accountability: +0.3 } },
+            "Qui valuti se regole di incompatibilità e requisiti stringenti bastano a schermare gli organi (CSM/Alta Corte) da pressioni esterne e conflitti d’interesse.",
         required: true,
+        scoring: { vectorPerStep: { yesNo: +0.5, accountability: -0.3 }, dkVector: ZERO },
+    },
+    {
+        id: "Q15",
+        module: "D_Disciplina",
+        kind: "single_choice",
+        text:
+            "Per aumentare la fiducia nel sistema disciplinare preferisci…",
+        help:
+            "Punto di architettura: (A) un secondo livello ‘esterno’ distinto può aumentare la fiducia per chi teme autocontrollo; (B) restare nello stesso organo (ma con collegio diverso) privilegia continuità e specializzazione.",
+        required: true,
+        options: [
+            {
+                id: "A",
+                label: "Appello davanti a un organo diverso/esterno.",
+                score: { yesNo: -0.7, accountability: +0.6 },
+            },
+            {
+                id: "B",
+                label: "Appello nello stesso organo, ma con collegio diverso.",
+                score: { yesNo: +0.6, accountability: -0.2 },
+            },
+            { id: "DK", label: "Non so / dipende", score: ZERO },
+        ],
     },
 
     // =========================
-    // E — SCENARI FUTURI (single choice)
+    // E — TRANSIZIONE / ATTUAZIONE
     // =========================
     {
-        id: "E01",
-        module: "E_Scenari",
-        kind: "single_choice",
+        id: "Q16",
+        module: "E_Transizione",
+        kind: "likert5",
         text:
-            "Scenario: l’elenco parlamentare (professori/avvocati) è percepito come ‘di parte’. Quale valutazione ti pesa di più?",
+            "Accetto che dopo un eventuale Sì serva un periodo di attuazione con nuove leggi e assestamento.",
         help:
-            "Qui misuriamo la tua sensibilità al rischio di ‘filtro politico’ vs l’idea che il sorteggio riduca quel rischio.",
-        options: [
-            {
-                id: "A",
-                label: "Rischio gestibile: il sorteggio attenua e bilancia.",
-                score: { yesNo: +1.0, accountability: +0.6 },
-            },
-            {
-                id: "B",
-                label: "Rischio grave: già la lista parlamentare è politicizzazione.",
-                score: { yesNo: -1.0, accountability: -1.0 },
-            },
-            { id: "DK", label: "Non so / dipende", score: { yesNo: 0, accountability: 0 } },
-        ],
+            "Le riforme grandi richiedono norme attuative. Beneficio: definire meglio i dettagli. Rischio: fase di incertezza e scontri su come applicare le nuove regole.",
         required: true,
+        scoring: { vectorPerStep: { yesNo: +0.6, accountability: -0.1 }, dkVector: ZERO },
     },
     {
-        id: "E02",
-        module: "E_Scenari",
+        id: "Q17",
+        module: "E_Transizione",
+        kind: "likert5",
+        text:
+            "Mi preoccupa che ritardi o conflitti sull’attuazione possano creare un periodo lungo di regole poco chiare.",
+        help:
+            "Qui misuri quanto ti pesa una transizione “a metà”: nuove regole costituzionali, ma dettagli operativi che arrivano tardi o in modo contestato.",
+        required: true,
+        scoring: { vectorPerStep: { yesNo: -0.6, accountability: +0.2 }, dkVector: ZERO },
+    },
+
+    // =========================
+    // F — SCENARI FUTURI (HARD)
+    // =========================
+    {
+        id: "Q18",
+        module: "F_Scenari",
         kind: "single_choice",
         text:
-            "Scenario: calano le correnti, ma aumenta l’imprevedibilità/eterogeneità nelle decisioni del CSM. Cosa preferisci?",
+            "Scenario: una maggioranza politica forte, per anni, influenza indirettamente canali di selezione (liste/nomine/ruoli). Tu lo valuti come…",
         help:
-            "Trade-off: anti-correntismo vs prevedibilità/standardizzazione delle prassi.",
+            "Scenario di “cattura progressiva”: non un colpo di stato, ma un accumulo di leve che può indebolire i contrappesi nel tempo. Misura quanto ti sembra rischioso questo tipo di dinamica.",
+        required: true,
         options: [
             {
                 id: "A",
-                label: "Meglio meno correnti anche con più variabilità.",
-                score: { yesNo: +1.0, accountability: +0.4 },
+                label: "Rischio serio per l’equilibrio democratico.",
+                score: { yesNo: -1.2, accountability: +1.2 },
             },
             {
                 id: "B",
-                label: "Meglio prevedibilità anche se restano dinamiche correntizie.",
-                score: { yesNo: -0.7, accountability: -0.3 },
+                label: "Rischio limitato: i contrappesi sono sufficienti.",
+                score: { yesNo: +1.0, accountability: -0.8 },
             },
-            { id: "DK", label: "Non so / dipende", score: { yesNo: 0, accountability: 0 } },
+            { id: "DK", label: "Non so / dipende", score: ZERO },
         ],
-        required: true,
     },
     {
-        id: "E03",
-        module: "E_Scenari",
+        id: "Q19",
+        module: "F_Scenari",
         kind: "single_choice",
         text:
-            "Scenario: caso disciplinare ad alta esposizione mediatica. Ti fidi di più se decide…",
+            "Scenario: anche senza ordini diretti, la disciplina diventa una minaccia percepita contro chi indaga su poteri forti. Per te…",
         help:
-            "Misuriamo quale assetto ti dà più fiducia quando la pressione esterna è massima.",
+            "Scenario ‘pressione indiretta’: può bastare rendere rischioso colpire il potere per indebolire la funzione di controllo della giustizia. Misura la tua soglia di tolleranza a questo rischio.",
+        required: true,
         options: [
             {
                 id: "A",
-                label: "Alta Corte disciplinare dedicata.",
-                score: { yesNo: +1.2, accountability: +1.0 },
+                label: "È un rischio intollerabile (anche se raro).",
+                score: { yesNo: -1.2, accountability: +1.3 },
             },
             {
                 id: "B",
-                label: "Organo interno al CSM (autogoverno).",
-                score: { yesNo: -1.0, accountability: -1.0 },
+                label: "È un rischio gestibile con regole chiare e trasparenza.",
+                score: { yesNo: +0.9, accountability: -0.6 },
             },
-            { id: "DK", label: "Non so / dipende", score: { yesNo: 0, accountability: 0 } },
+            { id: "DK", label: "Non so / dipende", score: ZERO },
         ],
-        required: true,
     },
     {
-        id: "E04",
-        module: "E_Scenari",
+        id: "Q20",
+        module: "F_Scenari",
         kind: "single_choice",
         text:
-            "Scenario: l’appello disciplinare è interno alla stessa Alta Corte (collegio diverso). Qual è la tua reazione prevalente?",
+            "Scenario: vince il No e per anni non cambia davvero nulla (correntismo/opacità restano simili). Tu lo valuti come…",
         help:
-            "È un punto molto discriminante: fiducia nella specializzazione vs preferenza per un giudice ‘esterno’.",
+            "Questo scenario pesa l’altra faccia: se temi molto lo status quo, potresti accettare più rischi di riforma; se temi di più la cattura politica, potresti preferire lo status quo.",
+        required: true,
         options: [
             {
                 id: "A",
-                label: "Rassicura: continuità e specializzazione.",
-                score: { yesNo: +0.8, accountability: +0.6 },
+                label: "È un problema grave: serve cambiare.",
+                score: { yesNo: +1.0, accountability: -0.5 },
             },
             {
                 id: "B",
-                label: "Preoccupa: preferirei un livello esterno distinto.",
-                score: { yesNo: -1.0, accountability: -0.8 },
+                label: "È preferibile: meglio lo status quo che rischi di politicizzazione.",
+                score: { yesNo: -0.9, accountability: +0.6 },
             },
-            { id: "DK", label: "Non so / dipende", score: { yesNo: 0, accountability: 0 } },
+            { id: "DK", label: "Non so / dipende", score: ZERO },
         ],
-        required: true,
-    },
-    {
-        id: "E05",
-        module: "E_Scenari",
-        kind: "single_choice",
-        text:
-            "Scenario: due CSM sviluppano prassi divergenti. È più per te…",
-        help:
-            "Misuriamo la tua tolleranza per differenziazione/specializzazione vs timore di disomogeneità.",
-        options: [
-            {
-                id: "A",
-                label: "Normale specializzazione (accettabile).",
-                score: { yesNo: +0.7, accountability: +0.2 },
-            },
-            {
-                id: "B",
-                label: "Problema serio (rischio di conflitti/disomogeneità).",
-                score: { yesNo: -0.8, accountability: -0.2 },
-            },
-            { id: "DK", label: "Non so / dipende", score: { yesNo: 0, accountability: 0 } },
-        ],
-        required: true,
-    },
-    {
-        id: "E06",
-        module: "E_Scenari",
-        kind: "single_choice",
-        text:
-            "Scenario: incompatibilità rigide rendono difficile trovare candidati. Cosa preferisci?",
-        help:
-            "È un classico trade-off: integrità/assenza conflitti vs ampiezza del bacino di selezione.",
-        options: [
-            {
-                id: "A",
-                label: "Meglio poche candidature ma regole dure.",
-                score: { yesNo: +0.5, accountability: +1.0 },
-            },
-            {
-                id: "B",
-                label: "Meglio più candidature anche con regole meno rigide.",
-                score: { yesNo: -0.5, accountability: -1.0 },
-            },
-            { id: "DK", label: "Non so / dipende", score: { yesNo: 0, accountability: 0 } },
-        ],
-        required: true,
-    },
-    {
-        id: "E07",
-        module: "E_Scenari",
-        kind: "single_choice",
-        text:
-            "Scenario: l’attuazione legislativa slitta oltre l’anno. Per te è soprattutto…",
-        help:
-            "Misura quanto ti pesa l’incertezza applicativa in una riforma costituzionale.",
-        options: [
-            {
-                id: "A",
-                label: "Un rischio gestibile (transitorio previsto).",
-                score: { yesNo: +0.6, accountability: +0.1 },
-            },
-            {
-                id: "B",
-                label: "Un rischio inaccettabile (incertezza e frizioni).",
-                score: { yesNo: -0.8, accountability: -0.1 },
-            },
-            { id: "DK", label: "Non so / dipende", score: { yesNo: 0, accountability: 0 } },
-        ],
-        required: true,
     },
 ];
