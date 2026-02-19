@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { QUESTIONS } from '@/questions';
 
 export default function AdminPage() {
   const [password, setPassword] = useState('');
@@ -25,6 +26,26 @@ export default function AdminPage() {
       setError('Errore di connessione.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleExport = async () => {
+    try {
+      const res = await fetch('/api/admin/export', {
+        headers: { 'x-admin-token': password }
+      });
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'risposte_referendum.csv';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      }
+    } catch (err) {
+      console.error('Export failed');
     }
   };
 
@@ -63,8 +84,14 @@ export default function AdminPage() {
     <div className="container" style={{ maxWidth: '1200px' }}>
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-          <h1>Dashboard Amministratore</h1>
-          <button className="btn btn-secondary" onClick={() => setStats(null)}>Logout</button>
+          <div>
+            <h1>Dashboard Amministratore</h1>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Gestione e analisi dei dati del referendum</p>
+          </div>
+          <div style={{ display: 'flex', gap: '1rem' }}>
+            <button className="btn btn-primary" onClick={handleExport}>⬇️ Esporta CSV</button>
+            <button className="btn btn-secondary" onClick={() => setStats(null)}>Logout</button>
+          </div>
         </div>
 
         <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem', marginBottom: '3rem' }}>
@@ -132,6 +159,62 @@ export default function AdminPage() {
             </table>
           </section>
         </div>
+
+        {/* Question Analytics Section */}
+        <section className="card" style={{ background: 'rgba(255,255,255,0.02)', marginBottom: '3rem' }}>
+          <h2 style={{ marginBottom: '1.5rem' }}>Analisi per Singola Domanda</h2>
+          <div style={{ display: 'grid', gap: '2rem' }}>
+            {QUESTIONS.map((q) => {
+              const qStat = stats.questionStats?.[q.id];
+              if (!qStat) return null;
+              
+              return (
+                <div key={q.id} style={{ paddingBottom: '1.5rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                    <div style={{ flex: 1 }}>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--primary)', fontWeight: 800, textTransform: 'uppercase' }}>{q.id} - {q.module.replace(/_/g, ' ')}</span>
+                      <p style={{ margin: '0.25rem 0', fontWeight: 600 }}>{q.text}</p>
+                    </div>
+                    <div style={{ textAlign: 'right', marginLeft: '2rem' }}>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>MEDIA SCALE</div>
+                      <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--primary)' }}>{qStat.avg || '-'}</div>
+                    </div>
+                  </div>
+                  
+                  {/* Distribution Bar */}
+                  <div style={{ display: 'flex', gap: '4px', height: '24px', borderRadius: '4px', overflow: 'hidden', background: 'rgba(255,255,255,0.05)' }}>
+                    {q.kind === 'likert5' ? [1, 2, 3, 4, 5, 'DK'].map(val => {
+                      const count = qStat.dist[String(val)] || 0;
+                      const pct = stats.totalCount > 0 ? (count / stats.totalCount) * 100 : 0;
+                      if (pct === 0) return null;
+                      
+                      const colors: any = { '1': '#ef4444', '2': '#f87171', '3': '#94a3b8', '4': '#4ade80', '5': '#10b981', 'DK': '#475569' };
+                      
+                      return (
+                        <div 
+                          key={val} 
+                          title={`${val}: ${count} risposte (${Math.round(pct)}%)`}
+                          style={{ width: `${pct}%`, background: colors[val], height: '100%', transition: 'width 0.5s' }}
+                        />
+                      );
+                    }) : q.options.map(opt => {
+                      const count = qStat.dist[opt.id] || 0;
+                      const pct = stats.totalCount > 0 ? (count / stats.totalCount) * 100 : 0;
+                      if (pct === 0) return null;
+                      return (
+                        <div 
+                          key={opt.id} 
+                          title={`${opt.label}: ${count} risposte (${Math.round(pct)}%)`}
+                          style={{ width: `${pct}%`, background: 'var(--primary)', height: '100%', opacity: 0.5 + (opt.id === 'A' ? 0.5 : 0), transition: 'width 0.5s' }}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
 
         <section className="card" style={{ background: 'rgba(0,0,0,0.1)', overflowX: 'auto' }}>
           <h2 style={{ marginBottom: '1.5rem' }}>Ultime 100 Risposte</h2>
